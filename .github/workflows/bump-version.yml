@@ -96,35 +96,38 @@ jobs:
         env:
           BUMP_TYPE: ${{ steps.bump-type.outputs.TYPE }}
         run: |
-          node -e "
-            const fs = require('fs');
-            const path = 'main/script.user.js';
+          node -e '
+            const fs = require("fs");
+            const path = "main/script.user.js";
+            if (!fs.existsSync(path)) {
+              console.error("File not found:", path);
+              process.exit(1);
+            }
 
+            let content = fs.readFileSync(path, "utf8");
             const regex = /\/\/ @version\s+(\d+\.\d+\.\d+)/;
-            let content = fs.readFileSync(path, 'utf8');
+            const match = content.match(regex);
 
-            let match = content.match(regex);
-            if (!match) process.exit(1);
+            if (!match) {
+              console.error("Version not found in file");
+              process.exit(1);
+            }
 
-            let [major, minor, patch] = match[1].split('.').map(Number);
+            let [major, minor, patch] = match[1].split(".").map(Number);
+            const type = process.env.BUMP_TYPE;
 
-            if (process.env.BUMP_TYPE === 'major') { major++; minor = 0; patch = 0; }
-            else if (process.env.BUMP_TYPE === 'minor') { minor++; patch = 0; }
-            else if (process.env.BUMP_TYPE === 'patch') { patch++; }
+            if (type === "major") { major++; minor = 0; patch = 0; }
+            else if (type === "minor") { minor++; patch = 0; }
+            else if (type === "patch") { patch++; }
 
             const newVer = `${major}.${minor}.${patch}`;
             content = content.replace(regex, `// @version      ${newVer}`);
-
             fs.writeFileSync(path, content);
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `NEW_VERSION=${newVer}\n`);
-          "
 
-      - name: Commit and Push
-        if: ${{ steps.bump-type.outputs.TYPE != 'none' }}
-        run: |
-          git add main/script.user.js
-          git commit -m "chore: bump version to ${{ steps.update-version.outputs.NEW_VERSION }}"
-          git push --force-with-lease
+            console.log("Bumped version to", newVer);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `NEW_VERSION=${newVer}\n`);
+          '
+
 
       # ---------------------------------------------------------
       # 6. Merge del PR
