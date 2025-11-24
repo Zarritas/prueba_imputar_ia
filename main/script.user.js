@@ -16,7 +16,6 @@
 
 (function() {
     'use strict';
-    "Prueba de bump"
     if (!GM_getValue("API_KEY")){
         GM_setValue("API_KEY", prompt("Agregar clave API"))
     }
