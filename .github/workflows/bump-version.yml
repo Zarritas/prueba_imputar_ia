@@ -13,31 +13,44 @@ jobs:
       pull-requests: write
 
     steps:
-      #
-      # Mensaje inicial en el PR
-      #
-      - name: Enviar mensaje de iniciar proceso
+      # ---------------------------------------------------------
+      # 0. Mensaje inicial en el PR
+      # ---------------------------------------------------------
+      - name: Enviar mensaje: iniciando proceso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
             -f body="🛠️ Iniciando proceso de merge solicitado con \`/mergebot\`…"
 
-      #
-      # Checkout
-      #
-      - name: Checkout PR
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr checkout ${{ github.event.issue.number }}
+      # ---------------------------------------------------------
+      # 1. Checkout del repositorio (historial completo)
+      # ---------------------------------------------------------
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
+      # ---------------------------------------------------------
+      # 2. Obtener la rama del PR manualmente (método más estable)
+      # ---------------------------------------------------------
+      - name: Obtener rama del PR
+        run: |
+          git fetch origin pull/${{ github.event.issue.number }}/head:pr-${{ github.event.issue.number }}
+          git checkout pr-${{ github.event.issue.number }}
+
+      # ---------------------------------------------------------
+      # 3. Configurar identidad de Git
+      # ---------------------------------------------------------
       - name: Configurar identidad Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-      #
-      # Rebase con main
-      #
+
+      # ---------------------------------------------------------
+      # 4. Rebase con main
+      # ---------------------------------------------------------
       - name: Rebase con main
         id: rebase
         continue-on-error: true
@@ -52,12 +65,12 @@ jobs:
         run: |
           gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
             -f body="❌ No se pudo hacer **rebase con main**.  
-            Por favor, resuelve los conflictos manualmente."
+            Existen conflictos que deben resolverse manualmente."
           exit 1
 
-      #
-      # Node y bump de versión
-      #
+      # ---------------------------------------------------------
+      # 5. Node + bump version
+      # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -86,41 +99,36 @@ jobs:
           node -e "
             const fs = require('fs');
             const path = 'main/script.user.js';
-            if (!fs.existsSync(path)) process.exit(1);
 
-            const content = fs.readFileSync(path, 'utf8');
             const regex = /\/\/ @version\s+(\d+\.\d+\.\d+)/;
+            let content = fs.readFileSync(path, 'utf8');
 
-            const match = content.match(regex);
+            let match = content.match(regex);
             if (!match) process.exit(1);
 
             let [major, minor, patch] = match[1].split('.').map(Number);
-            const type = process.env.BUMP_TYPE;
 
-            if (type === 'major') { major++; minor = 0; patch = 0; }
-            if (type === 'minor') { minor++; patch = 0; }
-            if (type === 'patch') { patch++; }
+            if (process.env.BUMP_TYPE === 'major') { major++; minor = 0; patch = 0; }
+            else if (process.env.BUMP_TYPE === 'minor') { minor++; patch = 0; }
+            else if (process.env.BUMP_TYPE === 'patch') { patch++; }
 
             const newVer = `${major}.${minor}.${patch}`;
-            const newContent = content.replace(regex, `// @version      ${newVer}`);
+            content = content.replace(regex, `// @version      ${newVer}`);
 
-            fs.writeFileSync(path, newContent);
+            fs.writeFileSync(path, content);
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `NEW_VERSION=${newVer}\n`);
           "
 
       - name: Commit and Push
         if: ${{ steps.bump-type.outputs.TYPE != 'none' }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
           git add main/script.user.js
           git commit -m "chore: bump version to ${{ steps.update-version.outputs.NEW_VERSION }}"
           git push --force-with-lease
 
-      #
-      # Merge PR
-      #
+      # ---------------------------------------------------------
+      # 6. Merge del PR
+      # ---------------------------------------------------------
       - name: Merge PR
         id: merge
         continue-on-error: true
@@ -136,8 +144,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -f body="❌ No se pudo completar el **merge**.  
-            Puede haber conflictos o restricciones en GitHub."
+            -f body="❌ No se pudo hacer el **merge**.  
+            Puede haber conflictos o requisitos que impidan mergear el PR."
 
       - name: Merge correcto → comentar éxito
         if: ${{ steps.merge.outputs.MERGE_FAILED != 'true' }}
@@ -145,5 +153,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -f body="✅ **Merge completado con éxito**.  
+            -f body="✅ Merge completado con éxito.  
             Versión actualizada a \`${{ steps.update-version.outputs.NEW_VERSION }}\`."
