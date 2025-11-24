@@ -13,44 +13,29 @@ jobs:
       pull-requests: write
 
     steps:
-      # ---------------------------------------------------------
-      # 0. Mensaje inicial en el PR
-      # ---------------------------------------------------------
-      - name: Enviar mensaje iniciando proceso
+      - name: Enviar mensaje de inicio del proceso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
             -f body="🛠️ Iniciando proceso de merge solicitado con \`/mergebot\`…"
 
-      # ---------------------------------------------------------
-      # 1. Checkout del repositorio (historial completo)
-      # ---------------------------------------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      # ---------------------------------------------------------
-      # 2. Obtener la rama del PR manualmente (método más estable)
-      # ---------------------------------------------------------
       - name: Obtener rama del PR
         run: |
           git fetch origin pull/${{ github.event.issue.number }}/head:pr-${{ github.event.issue.number }}
           git checkout pr-${{ github.event.issue.number }}
 
-      # ---------------------------------------------------------
-      # 3. Configurar identidad de Git
-      # ---------------------------------------------------------
       - name: Configurar identidad Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # ---------------------------------------------------------
-      # 4. Rebase con main
-      # ---------------------------------------------------------
       - name: Rebase con main
         id: rebase
         continue-on-error: true
@@ -68,9 +53,6 @@ jobs:
             Existen conflictos que deben resolverse manualmente."
           exit 1
 
-      # ---------------------------------------------------------
-      # 5. Node + bump version
-      # ---------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -128,10 +110,17 @@ jobs:
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `NEW_VERSION=${newVer}\n`);
           '
 
+      - name: Error rebase → comentar en PR
+        if: ${{ steps.rebase.outputs.REBASE_FAILED == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api repos/${GITHUB_REPOSITORY}/issues/${{ github.event.issue.number }}/comments \
+            -f body="❌ No se pudo actualizar la versión, revisa el log: $RUN_URL.  
+            Existen conflictos que deben resolverse manualmente."
+          exit 1
 
-      # ---------------------------------------------------------
-      # 6. Merge del PR
-      # ---------------------------------------------------------
       - name: Merge PR
         id: merge
         continue-on-error: true
