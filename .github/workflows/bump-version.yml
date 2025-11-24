@@ -27,9 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Obtener rama del PR
-        run: |
-          git fetch origin pull/${{ github.event.issue.number }}/head:pr-${{ github.event.issue.number }}
-          git checkout pr-${{ github.event.issue.number }}
+        run: gh pr checkout ${{ github.event.issue.number }}
 
       - name: Configurar identidad Git
         run: |
