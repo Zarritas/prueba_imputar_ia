@@ -16,7 +16,7 @@ jobs:
       # ---------------------------------------------------------
       # 0. Mensaje inicial en el PR
       # ---------------------------------------------------------
-      - name: Enviar mensaje: iniciando proceso
+      - name: Enviar mensaje iniciando proceso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
