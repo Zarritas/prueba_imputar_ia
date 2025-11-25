@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Google GenAI - Método Directo (API Fetch)
 // @namespace    http://tampermonkey.net/
-// @version      4.4.1
+// @version      4.5.0
 // @description  Se conecta a la API de Gemini directamente usando GM_xmlhttpRequest, sin la biblioteca @google/genai.
 // @author       TuNombre
 // @match        https://git.*
