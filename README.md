@@ -1,1 +1,1 @@
-instalar script: https://github.com/FlJesusLorenzo/prueba_imputar_ia/raw/refs/heads/main/main/script.user.js
+Prueba a instalar script: https://github.com/FlJesusLorenzo/prueba_imputar_ia/raw/refs/heads/main/main/script.user.js
